@@ -1,0 +1,643 @@
+{
+  "info": {
+    "name": "AllServices - Tüm Servisler Entegre Test",
+    "description": "Tüm API servislerini sırayla test eden entegre koleksiyon.\n\nAkış:\n1. Auth: Login -> Me -> Session Idle -> Refresh -> Logout\n2. Kullanıcı Yönetimi: Login -> Listele -> Oluştur -> Devre Dışı Bırak\n3. Rol & Yetki: Login -> Rol-Yetki Listesi\n4. Admin Paneli: Login -> Kullanıcılar -> Oturumlar -> Oturum İptal\n5. Siparişler: Login -> memberUserId al -> Sipariş Oluştur (JWT) -> Getir (JWT) -> Tümünü Listele -> Sipariş Oluştur (Tenant) -> Getir (Tenant)\n6. Webhook: İmzalı Olay Gönder\n7. Public: JWKS, Actuator Health\n\nDeğişkenler:\n- baseUrl: http://localhost:8080\n- managementUrl: http://localhost:9091\n- username/password: admin/admin123\n- accessToken/refreshToken: otomatik doldurulur\n- memberUserId: JWT sub claim'inden alınır\n- userId: kullanıcı oluşturma sonrası alınır\n- orderId: sipariş oluşturma sonrası alınır\n- sessionId: oturum listesinden alınır",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Auth",
+      "description": "JWT token yönetimi: login, profil, oturum bilgisi, token yenileme, çıkış.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "  pm.collectionVariables.set('sessionId', json.sessionId);",
+                  "  const payload = JSON.parse(atob(json.accessToken.split('.')[1]));",
+                  "  pm.collectionVariables.set('memberUserId', payload.sub);",
+                  "  console.log('Login OK | sessionId: ' + json.sessionId + ' | userId: ' + payload.sub);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Me (Güncel Kullanıcı)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Session Idle Süresi",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session/idle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "session", "idle"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token (Rotation)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Kullanıcı Yönetimi",
+      "description": "Kullanıcı listeleme, oluşturma ve devre dışı bırakma.",
+      "item": [
+        {
+          "name": "Login (Token Al)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "  const payload = JSON.parse(atob(json.accessToken.split('.')[1]));",
+                  "  pm.collectionVariables.set('memberUserId', payload.sub);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Kullanıcıları Listele (USER_LIST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/list",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "list"]
+            }
+          }
+        },
+        {
+          "name": "Kullanıcı Oluştur (USER_CREATE)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const uniqueName = 'test_' + Date.now();",
+                  "pm.collectionVariables.set('newUsername', uniqueName);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.id) {",
+                  "  pm.collectionVariables.set('userId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{newUsername}}\",\n  \"password\": \"guclu-sifre-123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "create"]
+            }
+          }
+        },
+        {
+          "name": "Kullanıcıyı Devre Dışı Bırak (USER_DELETE)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Rol & Yetki",
+      "description": "Rol-yetki ilişkilerini listeleme.",
+      "item": [
+        {
+          "name": "Login (Token Al)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "  const payload = JSON.parse(atob(json.accessToken.split('.')[1]));",
+                  "  pm.collectionVariables.set('memberUserId', payload.sub);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Rol-Yetki İlişkilerini Listele",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles/list",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "roles", "list"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Admin Paneli",
+      "description": "Sayfalı kullanıcı/oturum listeleri ve oturum iptali.",
+      "item": [
+        {
+          "name": "Login (Token Al)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "  const payload = JSON.parse(atob(json.accessToken.split('.')[1]));",
+                  "  pm.collectionVariables.set('memberUserId', payload.sub);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Kullanıcılar (Sayfalı)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users?page=0&size=20&sort=username,asc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "username,asc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Oturumlar (Sayfalı)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.content && json.content.length > 0) {",
+                  "  pm.collectionVariables.set('sessionId', json.content[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/sessions?page=0&size=20&sort=loginAt,desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "sessions"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "loginAt,desc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Oturumu İptal Et",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/sessions/{{sessionId}}/revoke",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "sessions", "{{sessionId}}", "revoke"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Siparişler",
+      "description": "Sipariş oluşturma/okuma. JWT veya Tenant Key/Secret ile kimlik doğrulama.",
+      "item": [
+        {
+          "name": "Login (Token Al + memberUserId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "  const payload = JSON.parse(atob(json.accessToken.split('.')[1]));",
+                  "  pm.collectionVariables.set('memberUserId', payload.sub);",
+                  "  console.log('Login OK | memberUserId: ' + payload.sub);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Sipariş Oluştur (JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.id) {",
+                  "  pm.collectionVariables.set('orderId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Test siparisi - JWT kanali\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Sipariş Getir (JWT)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}"]
+            }
+          }
+        },
+        {
+          "name": "Tüm Siparişleri Listele (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/admin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "admin"]
+            }
+          }
+        },
+        {
+          "name": "Sipariş Oluştur (Tenant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.id) {",
+                  "  pm.collectionVariables.set('orderId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Tenant-Key", "value": "mobile-bff-key" },
+              { "key": "X-Tenant-Secret", "value": "mobile-bff-secret" },
+              { "key": "X-Current-User-Id", "value": "{{memberUserId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Test siparisi - Tenant kanali\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Sipariş Getir (Tenant)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Tenant-Key", "value": "mobile-bff-key" },
+              { "key": "X-Tenant-Secret", "value": "mobile-bff-secret" },
+              { "key": "X-Current-User-Id", "value": "{{memberUserId}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Webhook",
+      "description": "HMAC-SHA256 imzalı webhook olayı gönderimi.",
+      "item": [
+        {
+          "name": "Olay Gönder (İmzalı)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const timestamp = Math.floor(Date.now() / 1000);",
+                  "const raw = pm.request.body.raw;",
+                  "const signingSecret = pm.collectionVariables.get('webhookSigningSecret');",
+                  "const signature = 'sha256=' + CryptoJS.HmacSHA256(timestamp + '.' + raw, signingSecret).toString(CryptoJS.enc.Hex);",
+                  "pm.collectionVariables.set('webhookTimestamp', String(timestamp));",
+                  "pm.collectionVariables.set('webhookSignature', signature);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Webhook-Key", "value": "demo-webhook" },
+              { "key": "X-Webhook-Secret", "value": "webhook-secret" },
+              { "key": "X-Webhook-Timestamp", "value": "{{webhookTimestamp}}" },
+              { "key": "X-Webhook-Signature", "value": "{{webhookSignature}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventType\": \"ORDER_SHIPPED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "events"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Public Endpointler",
+      "description": "Kimlik doğrulaması gerektirmeyen herkese açık endpointler.",
+      "item": [
+        {
+          "name": "JWKS",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/.well-known/jwks.json",
+              "host": ["{{baseUrl}}"],
+              "path": [".well-known", "jwks.json"]
+            }
+          }
+        },
+        {
+          "name": "Actuator Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{managementUrl}}/actuator/health",
+              "host": ["{{managementUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "managementUrl", "value": "http://localhost:9091" },
+    { "key": "username", "value": "admin" },
+    { "key": "password", "value": "admin123" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "sessionId", "value": "" },
+    { "key": "memberUserId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "newUsername", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "webhookSigningSecret", "value": "webhook-signing-secret" },
+    { "key": "webhookTimestamp", "value": "" },
+    { "key": "webhookSignature", "value": "" }
+  ]
+}
